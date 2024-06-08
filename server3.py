@@ -158,7 +158,10 @@ def generate_csv():
 
 def read_csv():
     """ Read a CSV or order history into a list. """
-    with open('test.csv', 'rt') as f:
+    #if test.csv is in the same directory as the script, we can build a path dynamically
+    current_directory = os.path.dirname(os.path.realpath(__file__))
+    file_path = os.path.join(current_directory, 'test.csv')
+    with open(file_path, 'rt') as f:
         for time, stock, side, order, size in csv.reader(f):
             yield dateutil.parser.parse(time), stock, side, float(order), int(size)
 
@@ -258,9 +261,11 @@ class App(object):
         self._book_1 = dict()
         self._book_2 = dict()
         self._data_1 = order_book(read_csv(), self._book_1, 'ABC')
+        print("data 1 initialized", self._data_1)
         self._data_2 = order_book(read_csv(), self._book_2, 'DEF')
         self._rt_start = datetime.now()
         self._sim_start, _, _ = next(self._data_1)
+        print("reading 10 first lines")
         self.read_10_first_lines()
 
     @property
