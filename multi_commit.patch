@@ -1,0 +1,127 @@
+From 5eb69d90935be0ea94a689e32a825ec7a3d8667e Mon Sep 17 00:00:00 2001
+From: Stephen-Hrrll <stephenhrrll8@gmail.com>
+Date: Sat, 8 Jun 2024 17:06:31 -0400
+Subject: [PATCH 1/4] Encountered bug where next(self._data_1) was ending
+ prematurely in App.__init__. Fixed by dynamically building a path to
+ 'test.csv'
+
+---
+ server3.py | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/server3.py b/server3.py
+index 1836de2..fbed5a3 100644
+--- a/server3.py
++++ b/server3.py
+@@ -158,7 +158,10 @@ def generate_csv():
+ 
+ def read_csv():
+     """ Read a CSV or order history into a list. """
+-    with open('test.csv', 'rt') as f:
++    #if test.csv is in the same directory as the script, we can build a path dynamically
++    current_directory = os.path.dirname(os.path.realpath(__file__))
++    file_path = os.path.join(current_directory, 'test.csv')
++    with open(file_path, 'rt') as f:
+         for time, stock, side, order, size in csv.reader(f):
+             yield dateutil.parser.parse(time), stock, side, float(order), int(size)
+ 
+@@ -258,9 +261,11 @@ class App(object):
+         self._book_1 = dict()
+         self._book_2 = dict()
+         self._data_1 = order_book(read_csv(), self._book_1, 'ABC')
++        print("data 1 initialized", self._data_1)
+         self._data_2 = order_book(read_csv(), self._book_2, 'DEF')
+         self._rt_start = datetime.now()
+         self._sim_start, _, _ = next(self._data_1)
++        print("reading 10 first lines")
+         self.read_10_first_lines()
+ 
+     @property
+-- 
+2.44.0.windows.1
+
+
+From 9bc4f83ab66ef18a61dd267fbe9619a97f78630a Mon Sep 17 00:00:00 2001
+From: Stephen-Hrrll <stephenhrrll8@gmail.com>
+Date: Sat, 8 Jun 2024 17:10:54 -0400
+Subject: [PATCH 2/4] fixed price to be avg. of bid and ask prices
+
+---
+ client3.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/client3.py b/client3.py
+index 3fc09b7..e73447e 100644
+--- a/client3.py
++++ b/client3.py
+@@ -35,7 +35,7 @@ def getDataPoint(quote):
+     stock = quote['stock']
+     bid_price = float(quote['top_bid']['price'])
+     ask_price = float(quote['top_ask']['price'])
+-    price = bid_price
++    price = (bid_price + ask_price) / 2
+     return stock, bid_price, ask_price, price
+ 
+ 
+-- 
+2.44.0.windows.1
+
+
+From 5917dc412a79dd4bc7a20f7bb743e5805f7babd6 Mon Sep 17 00:00:00 2001
+From: Stephen-Hrrll <stephenhrrll8@gmail.com>
+Date: Sat, 8 Jun 2024 17:12:01 -0400
+Subject: [PATCH 3/4] updated getRation to return proce_a/ price_b while
+ avoiding div. by zero error
+
+---
+ client3.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/client3.py b/client3.py
+index e73447e..49101d5 100644
+--- a/client3.py
++++ b/client3.py
+@@ -42,7 +42,9 @@ def getDataPoint(quote):
+ def getRatio(price_a, price_b):
+     """ Get ratio of price_a and price_b """
+     """ ------------- Update this function ------------- """
+-    return 1
++    if price_b == 0:
++        return # Avoid zero division error
++    return price_a / price_b
+ 
+ 
+ # Main
+-- 
+2.44.0.windows.1
+
+
+From 22ee796c600aff0fb249fc2c11cfbf79b948e570 Mon Sep 17 00:00:00 2001
+From: Stephen-Hrrll <stephenhrrll8@gmail.com>
+Date: Sat, 8 Jun 2024 17:13:53 -0400
+Subject: [PATCH 4/4] added dictionary to store stock price while iterating
+ through quotes, then passes stored values to getRatio
+
+---
+ client3.py | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/client3.py b/client3.py
+index 49101d5..5721d3e 100644
+--- a/client3.py
++++ b/client3.py
+@@ -54,8 +54,10 @@ if __name__ == "__main__":
+         quotes = json.loads(urllib.request.urlopen(QUERY.format(random.random())).read())
+ 
+         """ ----------- Update to get the ratio --------------- """
++        prices = {} 
+         for quote in quotes:
+             stock, bid_price, ask_price, price = getDataPoint(quote)
++            prices[stock] = price
+             print("Quoted %s at (bid:%s, ask:%s, price:%s)" % (stock, bid_price, ask_price, price))
+ 
+-        print("Ratio %s" % getRatio(price, price))
++        print("Ratio %s" % getRatio(prices["ABC"], prices["DEF"]))
+-- 
+2.44.0.windows.1
+
